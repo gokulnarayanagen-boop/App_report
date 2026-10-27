@@ -111,3 +111,8 @@ where email = 'mgokulnarayana@gmail.com';
 This assigns a sign-in name; it does not create an account, set a password, or change its role. You must still create your own Supabase Auth user and promote that profile to admin using the setup instructions above.
 
 The username function authenticates through Supabase Auth, returns session tokens only after password verification, never returns the account email, rejects disabled users, and limits attempts to 10 per username per 15-minute window. Sign in with your email if that username is temporarily throttled. The lookup and throttle use server-only privileges; no anonymous profile lookup is granted. The `username-login` function is intentionally callable before sign-in, while `admin-users` always verifies the caller's administrator permissions.
+
+
+## Removing and restoring issues
+
+Run `supabase db push --linked` to apply `003_issue_trash.sql`. Administrators and developers can open an issue → Move to trash → confirm. Trashed issues are excluded from active lists, board views, counts, and exports. Open Trash from the sidebar to restore a report. Comments and private screenshots are preserved and become accessible again after restoration. Testers cannot delete or restore issues. Developers can only manage issues in assigned projects. Trash and restore operations are recorded in the activity history. Permanent deletion is intentionally not exposed.

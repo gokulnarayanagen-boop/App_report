@@ -17,3 +17,8 @@ test('demo records reference existing projects, reporters, and memberships',()=>
  for(const issue of data.issues){assert.ok(data.projects.some(p=>p.id===issue.project_id));assert.ok(data.profiles.some(p=>p.id===issue.created_by));}
  assert.equal(new Set(data.issues.map(i=>i.id)).size,12);
 });
+
+test('trashed issues stay out of active filters and exports',()=>{
+ const rows=[{id:'active',summary:'Current report'},{id:'deleted',summary:'Removed report',deleted_at:new Date().toISOString()}];
+ assert.deepEqual(filterIssues(rows,{},'user').map(i=>i.id),['active']);
+});
