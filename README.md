@@ -116,3 +116,8 @@ The username function authenticates through Supabase Auth, returns session token
 ## Removing and restoring issues
 
 Run `supabase db push --linked` to apply `003_issue_trash.sql`. Administrators and developers can open an issue → Move to trash → confirm. Trashed issues are excluded from active lists, board views, counts, and exports. Open Trash from the sidebar to restore a report. Comments and private screenshots are preserved and become accessible again after restoration. Testers cannot delete or restore issues. Developers can only manage issues in assigned projects. Trash and restore operations are recorded in the activity history. Permanent deletion is intentionally not exposed.
+
+
+## Appearance
+
+Use the sun/moon button on the sign-in screen or workspace header to switch between light and dark mode. Settings → Appearance also offers Match device. Theme preference is saved in this browser, follows device changes in automatic mode, and synchronizes across tabs.
