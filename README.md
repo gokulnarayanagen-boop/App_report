@@ -54,6 +54,9 @@ Every project member sees all reports in their assigned project. Administrators 
 
 ## Hosting and sharing
 
+GitHub Pages is configured to publish `main` → `/ (root)`. The root `index.html` loads the app assets from `dist/` using a relative base URL, so both project URLs and issue hash links work. Keep the root entry page in sync if the document head or script entry changes. `.nojekyll` disables unnecessary Jekyll processing.
+
+
 Deploy the contents of `dist/` to any static web host over HTTPS. The Sites preview is owner-private by default, so testers cannot visit it until its access is explicitly shared or the frontend is hosted at a URL they can reach. Supabase authentication and row-level project permissions remain enforced independently of frontend hosting.
 
 The app refreshes when the browser regains focus and every 60 seconds while visible. Realtime subscriptions work if you enable the `issues` and `notifications` tables for Supabase Realtime; polling remains available without that optional configuration.
