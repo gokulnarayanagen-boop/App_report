@@ -16,7 +16,9 @@ Open http://127.0.0.1:4173. Choose **Explore demo workspace** to try the app bef
 
 The supplied project URL and public publishable key are already in `dist/config.js`. A publishable key belongs in the frontend; server secrets never do.
 
-1. Open the Supabase project → SQL Editor → New query. Paste the contents of `supabase/migrations/001_workspace.sql` and run it **once**. It creates tables, role rules, project access rules, activity/notification triggers, and a private `issue-images` bucket. The SQL is transactional: an error rolls back the setup.
+1. Run `supabase/migrations/002_usernames.sql` after the initial setup below. Existing installations should run only this new migration; do not rerun `001_workspace.sql`.
+
+   Open the Supabase project → SQL Editor → New query. Paste the contents of `supabase/migrations/001_workspace.sql` and run it **once**. It creates tables, role rules, project access rules, activity/notification triggers, and a private `issue-images` bucket. The SQL is transactional: an error rolls back the setup.
 2. Go to Authentication → Users → Add user → Create new user. Create your own admin login with Auto Confirm User enabled. Promote that exact account from SQL Editor:
 
    ```sql
@@ -33,6 +35,7 @@ The supplied project URL and public publishable key are already in `dist/config.
    supabase login
    supabase link --project-ref aywtgapueekmhvyomoyc
    supabase functions deploy admin-users
+   supabase functions deploy username-login
    ```
 
    `supabase/config.toml` points at `index.js`, so no TypeScript is needed. Gateway JWT verification is disabled because the function explicitly verifies each user JWT through `auth.getUser(token)` and checks the caller's active administrator profile before privileged operations. Supabase provides the server credential to its function runtime. Never put that credential in `dist/` or share it in chat.
@@ -53,6 +56,9 @@ The supplied project URL and public publishable key are already in `dist/config.
 Every project member sees all reports in their assigned project. Administrators see every project. Developers only see their assigned projects. Disabled users lose database access even if an old authentication session remains open. Passwords are managed by Supabase Auth and never stored in public application tables.
 
 ## Hosting and sharing
+
+GitHub Pages is configured to publish `main` → `/ (root)`. The root `index.html` loads the app assets from `dist/` using a relative base URL, so both project URLs and issue hash links work. Keep the root entry page in sync if the document head or script entry changes. `.nojekyll` disables unnecessary Jekyll processing.
+
 
 Deploy the contents of `dist/` to any static web host over HTTPS. The Sites preview is owner-private by default, so testers cannot visit it until its access is explicitly shared or the frontend is hosted at a URL they can reach. Supabase authentication and row-level project permissions remain enforced independently of frontend hosting.
 
@@ -86,3 +92,22 @@ These checks cover project isolation, privilege escalation, reporter spoofing, w
 - `tests/` — application logic and database access checks.
 
 External browser dependencies: Supabase JS 2.57.4 from esm.sh and fonts from Google Fonts (system-font fallback). The app requires an internet connection for live Supabase use.
+
+
+## Email and username sign-in
+
+The same password works with either an email or an assigned username. Email login continues to work without the username function. New accounts require a unique username (3–32 lowercase letters, numbers, dots, underscores, or hyphens). Existing accounts have no username until one is assigned.
+
+After running both migrations and deploying `admin-users` and `username-login`, an administrator can open Team members → Manage → Set username, including on their own account. The username action allows the admin to edit their username while still preventing self-demotion or disabling their own account.
+
+For your first administrator, you can set a username directly in Supabase SQL Editor after the account exists:
+
+```sql
+update public.profiles
+set username = 'mgokulnarayana'
+where email = 'mgokulnarayana@gmail.com';
+```
+
+This assigns a sign-in name; it does not create an account, set a password, or change its role. You must still create your own Supabase Auth user and promote that profile to admin using the setup instructions above.
+
+The username function authenticates through Supabase Auth, returns session tokens only after password verification, never returns the account email, rejects disabled users, and limits attempts to 10 per username per 15-minute window. Sign in with your email if that username is temporarily throttled. The lookup and throttle use server-only privileges; no anonymous profile lookup is granted. The `username-login` function is intentionally callable before sign-in, while `admin-users` always verifies the caller's administrator permissions.

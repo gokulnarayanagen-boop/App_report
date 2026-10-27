@@ -2,3 +2,7 @@ project_id = "gnits-develop"
 [functions.admin-users]
 verify_jwt = false
 entrypoint = "./functions/admin-users/index.js"
+
+[functions.username-login]
+verify_jwt = false
+entrypoint = "./functions/username-login/index.js"

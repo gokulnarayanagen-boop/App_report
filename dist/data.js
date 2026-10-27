@@ -27,7 +27,14 @@ export class Repository {
   if(this.demo){try{this.store=JSON.parse(localStorage.getItem(DEMO_KEY));}catch{}if(!this.store)this.store=demoSeed();this.user={id:this.store.profiles[0].id,email:this.store.profiles[0].email};return this.user;}
   this.db=await getClient();const {data,error}=await this.db.auth.getSession();if(error)throw error;this.user=data.session?.user||null;return this.user;
  }
- async login(email,password){this.db=await getClient();const {data,error}=await this.db.auth.signInWithPassword({email,password});if(error)throw error;this.user=data.user;return data.user;}
+ async login(identifier,password){
+  this.db=await getClient();identifier=identifier.trim();
+  if(identifier.includes('@')){const {data,error}=await this.db.auth.signInWithPassword({email:identifier,password});if(error)throw error;this.user=data.user;return data.user;}
+  const response=await fetch(SUPABASE_URL+'/functions/v1/username-login',{method:'POST',headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY},body:JSON.stringify({username:identifier.toLowerCase(),password})});
+  let result;try{result=await response.json();}catch{throw new Error('Username sign-in is unavailable. Use your email for now.');}
+  if(!response.ok)throw new Error(result.error||'Username sign-in is unavailable. Deploy the username-login function, or sign in with your email.');
+  const {data,error}=await this.db.auth.setSession({access_token:result.access_token,refresh_token:result.refresh_token});if(error)throw error;this.user=data.user;return data.user;
+ }
  async logout(){this.channel&&await this.db?.removeChannel(this.channel);if(!this.demo&&this.db){const {error}=await this.db.auth.signOut();if(error)throw error;}this.user=null;}
  persist(){try{localStorage.setItem(DEMO_KEY,JSON.stringify(this.store));}catch{throw new Error('Demo storage is full. Remove a screenshot or reset the demo.');}}
  async all(table){if(this.demo)return structuredClone(this.store[table]||[]);const rows=[];for(let offset=0;;offset+=1000){const {data,error}=await this.db.from(table).select('*').order(table==='project_members'?'project_id':'id').range(offset,offset+999);if(error)throw error;rows.push(...data);if(data.length<1000)break;}return rows;}
@@ -57,7 +64,7 @@ export class Repository {
  }
  async imageUrl(attachment){if(this.demo)return attachment.demo_url;const {data,error}=await this.db.storage.from('issue-images').createSignedUrl(attachment.path,600);if(error)throw error;return data.signedUrl;}
  async removeAttachment(a){if(this.demo){this.store.attachments=this.store.attachments.filter(r=>r.id!==a.id);this.persist();return;}const {error}=await this.db.storage.from('issue-images').remove([a.path]);if(error)throw error;const {error:e}=await this.db.from('attachments').delete().eq('id',a.id);if(e)throw e;}
- async admin(values){if(this.demo){if(values.action==='create')return this.insert('profiles',{full_name:values.full_name,email:values.email,role:values.role,active:true});if(values.action==='update')return this.update('profiles',values.user_id,{role:values.role,active:values.active});return {ok:true};}const {data,error}=await this.db.functions.invoke('admin-users',{body:values});if(error){let message='Account management is unavailable. Deploy the admin-users function from the setup guide.';try{const b=await error.context?.json();if(b?.error)message=b.error;}catch{}throw new Error(message);}if(data.error)throw new Error(data.error);return data;}
+ async admin(values){if(this.demo){if(values.action==='create')return this.insert('profiles',{full_name:values.full_name,email:values.email,username:values.username,role:values.role,active:true});if(values.action==='set-username'){const username=values.username.trim().toLowerCase();if(this.store.profiles.some(u=>u.username===username&&u.id!==values.user_id))throw new Error('That username is already in use.');return this.update('profiles',values.user_id,{username});}if(values.action==='update')return this.update('profiles',values.user_id,{role:values.role,active:values.active});return {ok:true};}const {data,error}=await this.db.functions.invoke('admin-users',{body:values});if(error){let message='Account management is unavailable. Deploy the admin-users function from the setup guide.';try{const b=await error.context?.json();if(b?.error)message=b.error;}catch{}throw new Error(message);}if(data.error)throw new Error(data.error);return data;}
  async changePassword(password){if(this.demo)return;const {error}=await this.db.auth.updateUser({password});if(error)throw error;}
  subscribe(callback){if(this.demo)return;this.channel=this.db.channel('workspace-'+this.user.id).on('postgres_changes',{event:'*',schema:'public',table:'issues'},callback).on('postgres_changes',{event:'*',schema:'public',table:'notifications'},callback).subscribe();}
 }

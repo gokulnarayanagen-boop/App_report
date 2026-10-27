@@ -13,6 +13,7 @@ create table storage.objects(id uuid primary key default gen_random_uuid(),bucke
 alter table storage.objects enable row level security;
 grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;`);
 await db.exec(await readFile(new URL('../supabase/migrations/001_workspace.sql',import.meta.url),'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/002_usernames.sql',import.meta.url),'utf8'));
 const admin='11111111-1111-4111-8111-111111111111',tester='22222222-2222-4222-8222-222222222222',dev='33333333-3333-4333-8333-333333333333',other='44444444-4444-4444-8444-444444444444',p1='55555555-5555-4555-8555-555555555555',p2='66666666-6666-4666-8666-666666666666',issue='77777777-7777-4777-8777-777777777777';
 for(const [id,email] of [[admin,'admin@test.example'],[tester,'tester@test.example'],[dev,'dev@test.example'],[other,'other@test.example']])await db.query('insert into auth.users(id,email)values($1,$2)',[id,email]);
 await db.query("update public.profiles set role='admin' where id=$1",[admin]);
@@ -52,4 +53,13 @@ await denied('archived project rejects new reports',tester,"insert into issues(p
 await db.query('update profiles set active=false where id=$1',[tester]);
 assert.equal((await as(tester,'select * from projects')).rows.length,0);
 assert.equal((await as(tester,'select * from issues')).rows.length,0);console.log('PASS: disabling account revokes existing session data access');
-console.log('Database migration and 21 access-control checks passed.');await db.close();
+await db.query('update profiles set username=$1 where id=$2',['gokul',admin]);
+await assert.rejects(()=>db.query('update profiles set username=$1 where id=$2',['gokul',dev]));
+await assert.rejects(()=>db.query('update profiles set username=$1 where id=$2',['Invalid Name',dev]));
+await denied('testers cannot change their sign-in username',other,'update profiles set username=$1 where id=$2',['other',other]);
+await denied('public users cannot call login throttle',other,"select public.consume_username_login('gokul')");
+await db.exec('set role service_role');
+for(let n=1;n<=11;n++){const result=await db.query("select public.consume_username_login('gokul') allowed");assert.equal(result.rows[0].allowed,n<=10);}
+await db.exec('reset role');
+console.log('PASS: username uniqueness, validation, edit restrictions, and persistent login throttling');
+console.log('Database and username access-control checks passed.');await db.close();
