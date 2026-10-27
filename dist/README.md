@@ -1,123 +1,98 @@
 # GNITS_develop
 
-A complete project issue workspace built with HTML, CSS, plain JavaScript, and Supabase. There are no TypeScript files and no framework build step. Modern Angular requires TypeScript, so this implementation follows the requested JavaScript-only constraint.
+A project issue workspace using HTML, CSS, plain JavaScript, and Supabase. There are no TypeScript files or framework build steps.
 
-## Start locally
+Live frontend: https://gokulnarayanagen-boop.github.io/App_report/
 
-Install Node.js, open this folder in a terminal, and run:
+## Local preview
 
-```
-npm start
-```
+With Node.js installed, run `npm start` from this folder and open http://127.0.0.1:4173. Choose **Explore demo workspace** to use sample data saved only in this browser. Demo attachments are limited to 1.5 MB; demo password changes are simulated. Reset sample data in Settings.
 
-Open http://127.0.0.1:4173. Choose **Explore demo workspace** to try the app before configuring Supabase. Sample data stays in this browser and is separate from live Supabase data. Password actions are simulated in demo mode. Reset sample data from Settings.
+## Features
 
-## Connect live Supabase
+- Administrator, developer, and tester roles; admin-created accounts, account disabling, roles, usernames, and password management.
+- Multiple projects, project membership, archiving, and row-level access control. Admins see every project; other users see assigned projects.
+- Issue summary, description, type, priority, **severity**, reproduction steps, expected/actual results, affected app version, device, **target release**, and **due date**.
+- **Releases:** version/build, name, target date, notes, and Planned / Testing / Released status. Cards calculate open issues, blockers, resolution progress, and whether all linked issues are closed. Release status is a team decision; computed readiness does not automatically publish anything.
+- **Issue templates:** built-in bug/improvement/feature forms, plus project-specific templates managed by admins and assigned developers. Applying a template replaces the description, steps, results, type, priority, and severity; it preserves the summary and attachments.
+- List and board views, search, pagination, project/status/priority/type/severity/release/deadline filters, and assignment.
+- **Bulk actions:** admins and assigned developers select up to 100 issues and change status, priority, severity, assignee, release, due date, or move to trash. Database updates are atomic: one invalid or unauthorized row rolls back the entire action. A release must belong to each selected issue's project.
+- **Saved views:** each account privately saves filter combinations. Views persist in Supabase across devices; “Due today” evaluates the current local calendar date each time.
+- **Attachments:** private PNG/JPEG/WebP/GIF images (up to 10 MB) and MP4/WebM/MOV recordings (up to 50 MB). The report form accepts up to five initial files; further files can be attached from the issue. In-browser capture records video only, requires the user's screen-sharing permission, and stops after three minutes. Unsupported browsers can upload an existing recording. Use the Open link for formats your browser cannot play.
+- Comments with **@mentions**. The mention picker inserts a teammate's handle; typing a handle directly also works. Active mentioned teammates must belong to the project or be admins. Notifications stay inside the app. Up to 20 teammates can be mentioned in one comment.
+- Database-generated activity history, in-app notifications, read tracking, duplicate links, dashboard counts, and CSV exports protected against formula injection.
+- Recoverable issue deletion. Admins and assigned developers use **Move to trash** and restore from **Trash**. Comments and attachments are preserved. Testers cannot trash or restore issues. Permanent issue deletion is not exposed.
+- Light/dark/device appearance mode, responsive layouts, keyboard navigation, accessible dialogs, and session-change recovery when switching accounts in another tab.
 
-The supplied project URL and public publishable key are already in `dist/config.js`. A publishable key belongs in the frontend; server secrets never do.
+## Supabase setup
 
-1. Run `supabase/migrations/002_usernames.sql` after the initial setup below. Existing installations should run only this new migration; do not rerun `001_workspace.sql`.
+The browser's publishable configuration is in `dist/config.js`. Never place a secret or service-role key in frontend files or GitHub.
 
-   Open the Supabase project → SQL Editor → New query. Paste the contents of `supabase/migrations/001_workspace.sql` and run it **once**. It creates tables, role rules, project access rules, activity/notification triggers, and a private `issue-images` bucket. The SQL is transactional: an error rolls back the setup.
-2. Go to Authentication → Users → Add user → Create new user. Create your own admin login with Auto Confirm User enabled. Promote that exact account from SQL Editor:
+1. Sign in to the Supabase account that owns the project and link it:
+
+   ```bash
+   supabase login --agent no --output-format text
+   supabase link --project-ref aywtgapueekmhvyomoyc --agent no
+   ```
+
+2. Apply database migrations in order using `supabase db push --linked --agent no`. Existing installations apply only migrations not recorded as applied. The migrations are:
+
+   - `001_workspace.sql`: accounts/profiles, projects, membership, issues, comments, images, activity, notifications, and access control.
+   - `002_usernames.sql`: unique usernames and server-only username login throttling.
+   - `003_issue_trash.sql`: recoverable issue deletion.
+   - `004_release_workflows.sql`: releases, templates, severity, deadlines, saved views, atomic bulk updates, mentions, and videos.
+
+   You can instead paste each entire file into Supabase SQL Editor once, in order. If a file was already run manually, mark that version applied with `supabase migration repair VERSION --status applied --linked` before using `db push`. Do not mark a version applied unless its complete SQL has succeeded. Each migration is transactional.
+
+3. Create your own login in Supabase → Authentication → Users → Add user → Create new user. Choose a private password and enable Auto Confirm User if you do not need email verification. Then promote the exact account from SQL Editor:
 
    ```sql
    update public.profiles
-   set role = 'admin'
-   where email = 'YOUR_ADMIN_EMAIL';
+   set role = 'admin', username = 'your_username'
+   where email = 'YOUR_ADMIN_EMAIL'
+   returning email, role, username;
    ```
 
-   Verify that one row was updated. User-supplied metadata never grants admin permissions.
-3. Turn off public sign-ups in the Supabase Authentication settings. All tester/developer accounts are created by the administrator.
-4. Deploy the account-management Edge Function. Install the official Supabase CLI if needed, then run these commands from this project folder:
+   The user must exist first. Username is 3–32 lowercase letters, numbers, dots, underscores, or hyphens. Public user metadata never grants administrator privileges. Turn off public sign-ups if all accounts are administrator-created.
 
-   ```
-   supabase login
-   supabase link --project-ref aywtgapueekmhvyomoyc
-   supabase functions deploy admin-users
-   supabase functions deploy username-login
+4. Deploy account and username functions:
+
+   ```bash
+   supabase functions deploy admin-users --project-ref aywtgapueekmhvyomoyc
+   supabase functions deploy username-login --project-ref aywtgapueekmhvyomoyc
    ```
 
-   `supabase/config.toml` points at `index.js`, so no TypeScript is needed. Gateway JWT verification is disabled because the function explicitly verifies each user JWT through `auth.getUser(token)` and checks the caller's active administrator profile before privileged operations. Supabase provides the server credential to its function runtime. Never put that credential in `dist/` or share it in chat.
-5. Sign in to the app as your administrator. Create projects, create tester/developer accounts, and open each project's settings → **Manage project access**. Share initial passwords privately. Members can change their own passwords in Settings.
+   Both use JavaScript entrypoints configured in `supabase/config.toml`. Gateway JWT verification is disabled because `admin-users` explicitly verifies the user's JWT with Supabase and requires an active admin profile, while `username-login` must run before authentication and verifies the password through Supabase Auth. The server credentials are provided inside the Supabase function runtime.
 
-## Included workflows
+5. Sign in, create projects and accounts, then open project settings → Manage project access. Share initial credentials privately. Users can change their password in Settings.
 
-- Admin, developer, and tester roles; account creation, disabling, role changes, and password reset.
-- Multiple projects, project descriptions/colors, member assignments, and archiving.
-- Issue summaries and descriptions; bug/improvement/feature types; priorities; reproduction steps; expected/actual results; device/browser; app version.
-- List and board views, combined filters, search, pagination, assignment, and issue links.
-- Open → In progress → Ready for testing → Closed workflow. Testers can verify ready fixes or reopen closed issues. Testers can edit their own reports; project developers and admins can edit reports in accessible projects.
-- Private image uploads (PNG/JPEG/WebP/GIF up to 10 MB), short-lived signed links, and screenshot removal. Up to five images during initial submission; more can be added from the issue detail screen.
-- Comments, database-generated activity history, duplicate linking within a project, in-app notifications, and read tracking.
-- Dashboard counts and project resolution progress; CSV export with protection against spreadsheet formula injection.
-- Responsive layouts, keyboard navigation, native accessible dialogs, and helpful setup/error screens.
+Email login works independently of the username function. The same password works with an assigned username. Username sign-in returns only verified session tokens, never an email lookup. Attempts are limited to 10 per username per 15-minute window; email sign-in remains available if a username is temporarily throttled.
 
-Every project member sees all reports in their assigned project. Administrators see every project. Developers only see their assigned projects. Disabled users lose database access even if an old authentication session remains open. Passwords are managed by Supabase Auth and never stored in public application tables.
+## Sharing and hosting
 
-## Hosting and sharing
+GitHub Pages publishes `main` → `/ (root)`. The root `index.html` has a relative base pointing to `dist/`, and `.nojekyll` avoids unnecessary processing. For other static hosts, deploy `dist/`. Frontend hosting is public; Supabase authentication and project rules control access to data independently.
 
-GitHub Pages is configured to publish `main` → `/ (root)`. The root `index.html` loads the app assets from `dist/` using a relative base URL, so both project URLs and issue hash links work. Keep the root entry page in sync if the document head or script entry changes. `.nojekyll` disables unnecessary Jekyll processing.
-
-
-Deploy the contents of `dist/` to any static web host over HTTPS. The Sites preview is owner-private by default, so testers cannot visit it until its access is explicitly shared or the frontend is hosted at a URL they can reach. Supabase authentication and row-level project permissions remain enforced independently of frontend hosting.
-
-The app refreshes when the browser regains focus and every 60 seconds while visible. Realtime subscriptions work if you enable the `issues` and `notifications` tables for Supabase Realtime; polling remains available without that optional configuration.
-
-Only images are accepted. No email or chat messages are sent by the app; notifications are inside the workspace.
+External browser dependencies are Supabase JS 2.57.4 from esm.sh and Google Fonts, with system-font fallback. Live data needs internet access. The app refreshes on browser focus and every 60 seconds while visible. Optional Realtime subscriptions work if `issues` and `notifications` are enabled for Supabase Realtime. No emails or chat messages are sent by application features.
 
 ## Validation
 
-```
+```bash
 npm run check
 npm test
 ```
 
-Database security checks use PGlite against a simulated Supabase auth/storage schema. Install it in a temporary folder and run:
+The database tests use a temporary PostgreSQL-compatible PGlite instance with a simulated Supabase auth/storage schema:
 
-```
+```bash
 npm install --prefix /tmp/gnits-db-check @electric-sql/pglite@0.3.14
 node tests/access-control.mjs /tmp/gnits-db-check/node_modules/@electric-sql/pglite/dist/index.js
 ```
 
-These checks cover project isolation, privilege escalation, reporter spoofing, workflow permissions, screenshot isolation, audit/notification tampering, archived projects, and disabled accounts. Live sign-in, live storage, and account-function deployment still require completing your Supabase setup.
+Optional DOM interaction checks use Happy DOM (not a full browser):
 
-## Files
-
-- `dist/` — deployable browser application and downloadable setup files.
-- `supabase/migrations/001_workspace.sql` — database and access-control setup.
-- `supabase/functions/admin-users/index.js` — secure server-side account management.
-- `supabase/config.toml` — JavaScript function deployment configuration.
-- `server.js` — dependency-free local preview server.
-- `tests/` — application logic and database access checks.
-
-External browser dependencies: Supabase JS 2.57.4 from esm.sh and fonts from Google Fonts (system-font fallback). The app requires an internet connection for live Supabase use.
-
-
-## Email and username sign-in
-
-The same password works with either an email or an assigned username. Email login continues to work without the username function. New accounts require a unique username (3–32 lowercase letters, numbers, dots, underscores, or hyphens). Existing accounts have no username until one is assigned.
-
-After running both migrations and deploying `admin-users` and `username-login`, an administrator can open Team members → Manage → Set username, including on their own account. The username action allows the admin to edit their username while still preventing self-demotion or disabling their own account.
-
-For your first administrator, you can set a username directly in Supabase SQL Editor after the account exists:
-
-```sql
-update public.profiles
-set username = 'mgokulnarayana'
-where email = 'mgokulnarayana@gmail.com';
+```bash
+npm install --prefix /tmp/gnits-ui-check happy-dom@20.8.4
+node tests/ui-flows.mjs /tmp/gnits-ui-check/node_modules/happy-dom/lib/index.js
 ```
 
-This assigns a sign-in name; it does not create an account, set a password, or change its role. You must still create your own Supabase Auth user and promote that profile to admin using the setup instructions above.
-
-The username function authenticates through Supabase Auth, returns session tokens only after password verification, never returns the account email, rejects disabled users, and limits attempts to 10 per username per 15-minute window. Sign in with your email if that username is temporarily throttled. The lookup and throttle use server-only privileges; no anonymous profile lookup is granted. The `username-login` function is intentionally callable before sign-in, while `admin-users` always verifies the caller's administrator permissions.
-
-
-## Removing and restoring issues
-
-Run `supabase db push --linked` to apply `003_issue_trash.sql`. Administrators and developers can open an issue → Move to trash → confirm. Trashed issues are excluded from active lists, board views, counts, and exports. Open Trash from the sidebar to restore a report. Comments and private screenshots are preserved and become accessible again after restoration. Testers cannot delete or restore issues. Developers can only manage issues in assigned projects. Trash and restore operations are recorded in the activity history. Permanent deletion is intentionally not exposed.
-
-
-## Appearance
-
-Use the sun/moon button on the sign-in screen or workspace header to switch between light and dark mode. Settings → Appearance also offers Match device. Theme preference is saved in this browser, follows device changes in automatic mode, and synchronizes across tabs.
+Coverage includes project isolation, privilege escalation, issue workflow restrictions, deleted-record access, release associations, saved-view privacy, mention recipients, media limits, atomic bulk rollback, session mismatches, and interface form flows. Screen capture lifecycle uses a fake stream in tests; real screen capture requires a compatible browser and user permission.
