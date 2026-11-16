@@ -22,7 +22,7 @@ Deno.serve(async req => {
    const role=body.role;
    const username=String(body.username||'').trim().toLowerCase();
    if(!/^[a-z0-9][a-z0-9_.-]{2,31}$/.test(username)) return respond({error:'Username must be 3–32 characters: letters, numbers, dots, underscores, or hyphens.'},400);
-   if(!name||name.length>120||!/^\S+@\S+\.\S+$/.test(email)||password.length<12||!['tester','developer','admin'].includes(role)) return respond({error:'Enter a name, valid email, role, and a password of at least 12 characters.'},400);
+   if(!name||name.length>120||!/^\S+@\S+\.\S+$/.test(email)||password.length<8||!['tester','developer','admin'].includes(role)) return respond({error:'Enter a name, valid email, role, and a password of at least 8 characters.'},400);
    const {data,error}=await db.auth.admin.createUser({email,password,email_confirm:true,user_metadata:{full_name:name}});
    if(error) return respond({error:error.message},400);
    const {error:profileError}=await db.from('profiles').update({role,full_name:name,username}).eq('id',data.user.id);
@@ -46,7 +46,7 @@ Deno.serve(async req => {
    return respond({ok:true});
   }
   if(body.action==='reset-password') {
-   if(!body.user_id||String(body.password||'').length<12) return respond({error:'A password of at least 12 characters is required'},400);
+   if(!body.user_id||String(body.password||'').length<8) return respond({error:'A password of at least 8 characters is required'},400);
    const {error}=await db.auth.admin.updateUserById(body.user_id,{password:body.password});
    if(error) return respond({error:error.message},400);
    return respond({ok:true});

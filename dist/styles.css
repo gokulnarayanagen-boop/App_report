@@ -72,3 +72,8 @@ html[data-theme="dark"] .severity-blocker{background:#482c38;color:#ffb6c8;borde
 @media(max-width:900px){.sidebar{overflow-y:auto}.sidebar .brand{margin-bottom:25px}.side-projects{margin-top:24px}.side-note{display:none}.side-bottom{padding-top:18px}.release-grid{grid-template-columns:1fr}.content .filters select{max-width:none}.saved-views select{max-width:220px}}
 @media(max-width:640px){.release-card{padding:19px}.saved-views{padding:12px}.saved-views select{flex:1;min-width:150px}.saved-views .hint{width:100%}.saved-views .btn{font-size:10px}.bulk-bar{gap:9px}.mention-picker select{max-width:100%;width:100%}.mention-picker .hint{font-size:9px}.attachment:has(video){width:100%}.attachment video{width:100%;height:auto;max-height:220px}.release-counts{justify-content:space-between;gap:16px}}
 .sidebar{overflow-y:auto}.sidebar>.brand,.sidebar>.nav,.sidebar>.side-projects,.sidebar>.side-bottom{flex-shrink:0}.sidebar .side-note{display:none}
+
+.password-control{display:flex;align-items:stretch;gap:8px}
+.password-control input{flex:1;min-width:0}
+.password-control .btn{width:auto;flex-shrink:0}
+.login-form .password-control .btn{width:auto;padding:8px}
